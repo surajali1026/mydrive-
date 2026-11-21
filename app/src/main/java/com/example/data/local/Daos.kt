@@ -39,6 +39,9 @@ interface ConnectedAccountDao {
     @Query("SELECT * FROM connected_accounts WHERE id = :accountId LIMIT 1")
     suspend fun getAccountById(accountId: String): ConnectedAccountEntity?
 
+    @Query("SELECT * FROM connected_accounts WHERE user_id = :userId AND provider_type = :providerType AND LOWER(account_email) = LOWER(:email) LIMIT 1")
+    suspend fun findByProviderAndEmail(userId: String, providerType: String, email: String): ConnectedAccountEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAccount(account: ConnectedAccountEntity)
 

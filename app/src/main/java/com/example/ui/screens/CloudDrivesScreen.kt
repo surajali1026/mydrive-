@@ -40,6 +40,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -98,7 +99,7 @@ import com.example.ui.viewmodel.MyDriveUiState
 @Composable
 fun CloudDrivesScreen(
     uiState: MyDriveUiState,
-    onConnectProvider: (CloudProviderType) -> Unit,
+    onConnectProvider: (CloudProviderType, String?) -> Unit,
     onRefreshQuotas: () -> Unit,
     onDisconnectAccount: (String) -> Unit,
     onMoveAccountPriority: (String, Boolean) -> Unit,
@@ -163,10 +164,25 @@ fun CloudDrivesScreen(
 
         // 2. Connected Accounts Section
         item {
-            Text(
-                text = "Connected Accounts (${uiState.accounts.size})",
-                style = MaterialTheme.typography.titleLarge
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Connected Accounts (${uiState.accounts.size})",
+                    style = MaterialTheme.typography.titleLarge
+                )
+                FilledTonalButton(
+                    onClick = { onConnectProvider(CloudProviderType.GOOGLE_DRIVE, null) },
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier.testTag("quick_add_google_drive_button")
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Add Google Drive", style = MaterialTheme.typography.labelLarge)
+                }
+            }
         }
 
         if (uiState.accounts.isEmpty()) {
@@ -208,7 +224,7 @@ fun CloudDrivesScreen(
                     canMoveDown = index < uiState.accounts.lastIndex,
                     onMoveUp = { onMoveAccountPriority(account.id, true) },
                     onMoveDown = { onMoveAccountPriority(account.id, false) },
-                    onReconnect = { onConnectProvider(account.provider) },
+                    onReconnect = { onConnectProvider(account.provider, account.accountEmail) },
                     onDisconnect = { onDisconnectAccount(account.id) }
                 )
             }
@@ -239,7 +255,7 @@ fun CloudDrivesScreen(
                             if (provider.isIntegrationPending) {
                                 showMegaInfoDialog = true
                             } else {
-                                onConnectProvider(provider)
+                                onConnectProvider(provider, null)
                             }
                         }
                     )
@@ -560,7 +576,7 @@ private fun ProviderDirectoryCard(
                     )
                     if (connectedCount > 0) {
                         Text(
-                            text = "• $connectedCount linked",
+                            text = if (connectedCount == 1) "• 1 linked" else "• $connectedCount accounts",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.tertiary
                         )
@@ -589,7 +605,7 @@ private fun ProviderDirectoryCard(
                 ) {
                     Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(if (connectedCount > 0) "Add" else "Connect")
+                    Text(if (connectedCount > 0) "Add Another" else "Connect")
                 }
             }
         }

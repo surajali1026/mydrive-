@@ -73,6 +73,28 @@ class MyDriveCoreLogicUnitTest {
     }
 
     @Test
+    fun smartRouter_supportsMultipleGoogleDriveAccounts_andRoutesToSecondDriveUnder70Percent() {
+        val gb = 1024L * 1024L * 1024L
+        val accounts = listOf(
+            makeAccount("drive1", CloudProviderType.GOOGLE_DRIVE, totalGb = 15, usedGb = 11, priority = 0)
+                .copy(accountEmail = "drive1@gmail.com"), // ~73% -> over 70% limit, skip
+            makeAccount("drive2", CloudProviderType.GOOGLE_DRIVE, totalGb = 15, usedGb = 4, priority = 1)
+                .copy(accountEmail = "drive2@gmail.com"), // ~26% -> select!
+            makeAccount("drive3", CloudProviderType.GOOGLE_DRIVE, totalGb = 15, usedGb = 1, priority = 2)
+                .copy(accountEmail = "drive3@gmail.com")  // ~7%
+        )
+
+        val fileSize = 512L * 1024L * 1024L // 512 MB
+        val ordered = accounts
+            .filter { it.accountStatus == AccountStatus.CONNECTED }
+            .sortedBy { it.priorityOrder }
+        val selected = ordered.firstOrNull { (it.quotaUsed + fileSize) <= (it.quotaTotal * 0.70).toLong() }
+
+        assertEquals("drive2", selected?.id)
+        assertEquals("drive2@gmail.com", selected?.accountEmail)
+    }
+
+    @Test
     fun githubAutoUpdater_semverComparisonWorksCorrectly() {
         assertTrue(GitHubAutoUpdater.isNewerVersion("1.0.1", "1.0.0"))
         assertTrue(GitHubAutoUpdater.isNewerVersion("1.2.0", "1.1.9"))

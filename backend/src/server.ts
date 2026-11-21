@@ -159,6 +159,7 @@ app.get("/api/oauth/:provider/authorize", requireAuth, (req: AuthenticatedReques
   const codeChallenge = String(req.query.code_challenge || "");
   const state = String(req.query.state || "");
   const redirectUri = String(req.query.redirect_uri || "mydrive://oauth/callback");
+  const rawLoginHint = typeof req.query.login_hint === "string" ? req.query.login_hint.trim() : "";
   if (!state) {
     res.status(400).json({ error: "Missing OAuth state" });
     return;
@@ -179,6 +180,9 @@ app.get("/api/oauth/:provider/authorize", requireAuth, (req: AuthenticatedReques
     for (const [k, v] of Object.entries(spec.extraAuthParams)) {
       params.set(k, v);
     }
+  }
+  if (rawLoginHint && rawLoginHint.length <= 254 && rawLoginHint.includes("@")) {
+    params.set("login_hint", rawLoginHint);
   }
 
   res.json({
@@ -240,6 +244,37 @@ app.post("/api/oauth/:provider/exchange", requireAuth, async (req: Authenticated
     return;
   }
 
+  // Resolve the actual cloud provider account email & live quota so multiple accounts per provider never collide
+  let resolvedEmail = req.userEmail || "Connected Account";
+  let quotaTotal = -1;
+  let quotaUsed = -1;
+
+  if (providerId === "google_drive") {
+    try {
+      const aboutResp = await fetch(
+        "https://www.googleapis.com/drive/v3/about?fields=user(emailAddress),storageQuota",
+        {
+          headers: { Authorization: `Bearer ${tokenData.access_token}` },
+        }
+      );
+      if (aboutResp.ok) {
+        const aboutJson = (await aboutResp.json()) as {
+          user?: { emailAddress?: string };
+          storageQuota?: { limit?: string; usage?: string };
+        };
+        if (aboutJson.user?.emailAddress) {
+          resolvedEmail = aboutJson.user.emailAddress.trim().toLowerCase();
+        }
+        const parsedLimit = Number(aboutJson.storageQuota?.limit);
+        const parsedUsage = Number(aboutJson.storageQuota?.usage);
+        if (Number.isFinite(parsedLimit) && parsedLimit > 0) quotaTotal = parsedLimit;
+        if (Number.isFinite(parsedUsage) && parsedUsage >= 0) quotaUsed = parsedUsage;
+      }
+    } catch {
+      // Fallback to MyDrive email if Google Drive profile fetch transiently fails; Android will refresh quota immediately
+    }
+  }
+
   const expiresAtEpochMs = tokenData.expires_in
     ? Date.now() + tokenData.expires_in * 1000
     : 0;
@@ -251,17 +286,47 @@ app.post("/api/oauth/:provider/exchange", requireAuth, async (req: Authenticated
     })
   );
 
-  const inserted = await pool.query(
-    `INSERT INTO connected_accounts (user_id, provider_type, account_email, encrypted_tokens, status)
-     VALUES ($1, $2, $3, $4, 'CONNECTED')
-     RETURNING id`,
-    [req.userId, providerId, req.userEmail || "Connected Account", encrypted]
+  // Deduplicate only when reconnecting the exact same (user, provider, email); distinct accounts always insert a new row
+  const existing = await pool.query(
+    `SELECT id FROM connected_accounts
+     WHERE user_id = $1 AND provider_type = $2 AND LOWER(account_email) = LOWER($3)
+     LIMIT 1`,
+    [req.userId, providerId, resolvedEmail]
   );
 
+  let accountId: string;
+  if (existing.rowCount && existing.rowCount > 0) {
+    accountId = existing.rows[0].id;
+    await pool.query(
+      `UPDATE connected_accounts
+       SET encrypted_tokens = $1,
+           quota_total = CASE WHEN $2 > 0 THEN $2 ELSE quota_total END,
+           quota_used = CASE WHEN $3 >= 0 THEN $3 ELSE quota_used END,
+           status = 'CONNECTED',
+           updated_at = NOW()
+       WHERE id = $4 AND user_id = $5`,
+      [encrypted, quotaTotal, quotaUsed, accountId, req.userId]
+    );
+  } else {
+    const inserted = await pool.query(
+      `INSERT INTO connected_accounts (
+         user_id, provider_type, account_email, encrypted_tokens, quota_total, quota_used, priority_order, status
+       )
+       VALUES (
+         $1, $2, $3, $4, $5, $6,
+         COALESCE((SELECT MAX(priority_order) + 1 FROM connected_accounts WHERE user_id = $1), 0),
+         'CONNECTED'
+       )
+       RETURNING id`,
+      [req.userId, providerId, resolvedEmail, encrypted, quotaTotal, quotaUsed]
+    );
+    accountId = inserted.rows[0].id;
+  }
+
   res.json({
-    accountId: inserted.rows[0].id,
+    accountId,
     providerType: providerId,
-    accountEmail: req.userEmail || "",
+    accountEmail: resolvedEmail,
     accessToken: tokenData.access_token,
     refreshToken: tokenData.refresh_token ?? null,
     expiresAtEpochMs,

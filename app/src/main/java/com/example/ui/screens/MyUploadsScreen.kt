@@ -120,6 +120,9 @@ fun MyUploadsScreen(
 
     val hasUpdateBadge = uiState.updateState is GitHubUpdateUiState.Available ||
         uiState.updateState is GitHubUpdateUiState.ReadyToInstall
+    val accountEmailById = remember(uiState.accounts) {
+        uiState.accounts.associate { it.id to it.accountEmail }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -290,6 +293,7 @@ fun MyUploadsScreen(
                     items(uiState.filteredFiles, key = { it.id }) { file ->
                         CloudFileCard(
                             file = file,
+                            accountEmail = accountEmailById[file.accountId],
                             onClick = { previewFile = file },
                             onDownload = { onDownloadFile(file) },
                             onRename = { renameTarget = file },
@@ -340,6 +344,7 @@ fun MyUploadsScreen(
     previewFile?.let { file ->
         FilePreviewSheet(
             file = file,
+            accountEmail = accountEmailById[file.accountId],
             onDismiss = { previewFile = null },
             onDownload = { onDownloadFile(file) },
             onRename = {
@@ -416,6 +421,7 @@ fun MyUploadsScreen(
 @Composable
 private fun CloudFileCard(
     file: CloudFileEntity,
+    accountEmail: String?,
     onClick: () -> Unit,
     onDownload: () -> Unit,
     onRename: () -> Unit,
@@ -468,8 +474,13 @@ private fun CloudFileCard(
                     )
                 }
                 Spacer(modifier = Modifier.height(3.dp))
+                val metaSuffix = if (!accountEmail.isNullOrBlank()) {
+                    "${formatShortDate(file.uploadedAt)} • $accountEmail"
+                } else {
+                    "${formatShortDate(file.uploadedAt)} • ${file.folderPath}"
+                }
                 Text(
-                    text = "${formatShortDate(file.uploadedAt)} • ${file.folderPath}",
+                    text = metaSuffix,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -710,6 +721,7 @@ private fun UploadRoutingModalSheet(
 @Composable
 private fun FilePreviewSheet(
     file: CloudFileEntity,
+    accountEmail: String?,
     onDismiss: () -> Unit,
     onDownload: () -> Unit,
     onRename: () -> Unit,
@@ -757,6 +769,9 @@ private fun FilePreviewSheet(
             ) {
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     PreviewMetaRow("Cloud Drive", file.provider.displayName)
+                    if (!accountEmail.isNullOrBlank()) {
+                        PreviewMetaRow("Account", accountEmail)
+                    }
                     PreviewMetaRow("Size", formatBytes(file.sizeBytes))
                     PreviewMetaRow("MIME Type", file.mimeType)
                     PreviewMetaRow("Folder", file.folderPath)

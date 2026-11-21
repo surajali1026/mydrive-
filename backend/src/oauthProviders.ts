@@ -30,7 +30,7 @@ export const OAUTH_PROVIDERS: Record<SupportedProviderId, OAuthProviderSpec> = {
     supportsPkce: true,
     clientIdEnv: "GOOGLE_CLIENT_ID",
     clientSecretEnv: "GOOGLE_CLIENT_SECRET",
-    extraAuthParams: { access_type: "offline", prompt: "consent" },
+    extraAuthParams: { access_type: "offline", prompt: "select_account consent" },
   },
   onedrive: {
     id: "onedrive",

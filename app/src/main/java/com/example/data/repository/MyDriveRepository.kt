@@ -211,7 +211,10 @@ class MyDriveRepository(
 
     // ==================== CLOUD PROVIDER OAUTH & QUOTAS ====================
 
-    suspend fun buildProviderOAuthUrl(provider: CloudProviderType): Result<String> = withContext(Dispatchers.IO) {
+    suspend fun buildProviderOAuthUrl(
+        provider: CloudProviderType,
+        loginHint: String? = null
+    ): Result<String> = withContext(Dispatchers.IO) {
         if (provider.isIntegrationPending) {
             return@withContext Result.failure(
                 IllegalStateException("${provider.displayName}: Integration Pending — official commercial SDK registration required.")
@@ -235,7 +238,8 @@ class MyDriveRepository(
             providerId = provider.id,
             codeChallenge = pkce.codeChallenge,
             state = pkce.state,
-            redirectUri = PkceHelper.REDIRECT_URI
+            redirectUri = PkceHelper.REDIRECT_URI,
+            loginHint = loginHint
         ).map { it.authorizeUrl }
     }
 
@@ -281,7 +285,13 @@ class MyDriveRepository(
         val quotaResult = adapter.getQuota(bundle.accessToken)
         val quota = (quotaResult as? CloudResult.Success)?.data
 
+        val resolvedEmail = quota?.accountEmail?.takeIf { it.isNotBlank() }
+            ?: bundle.accountEmail.takeIf { it.isNotBlank() }
+            ?: "Connected Account"
+
         val existingAccounts = db.connectedAccountDao().getAccountsSync(userId)
+        val existingMatch = db.connectedAccountDao().findByProviderAndEmail(userId, provider.id, resolvedEmail)
+
         val encrypted = tokenVault.encrypt(
             StoredOAuthTokens.toJson(
                 StoredOAuthTokens(
@@ -291,16 +301,18 @@ class MyDriveRepository(
                 )
             )
         )
+
+        val nextPriority = (existingAccounts.maxOfOrNull { it.priorityOrder } ?: -1) + 1
         val entity = ConnectedAccountEntity(
-            id = bundle.accountId.ifBlank { UUID.randomUUID().toString() },
+            id = existingMatch?.id ?: bundle.accountId.ifBlank { UUID.randomUUID().toString() },
             userId = userId,
             providerType = provider.id,
-            accountEmail = quota?.accountEmail?.ifBlank { bundle.accountEmail } ?: bundle.accountEmail.ifBlank { "Connected Account" },
+            accountEmail = resolvedEmail,
             encryptedTokens = encrypted,
-            quotaTotal = quota?.totalBytes ?: -1L,
-            quotaUsed = quota?.usedBytes ?: -1L,
+            quotaTotal = quota?.totalBytes ?: existingMatch?.quotaTotal ?: -1L,
+            quotaUsed = quota?.usedBytes ?: existingMatch?.quotaUsed ?: -1L,
             quotaIsEstimated = quota?.isEstimated ?: false,
-            priorityOrder = existingAccounts.size,
+            priorityOrder = existingMatch?.priorityOrder ?: nextPriority,
             status = AccountStatus.CONNECTED.name,
             lastSyncedAt = System.currentTimeMillis()
         )

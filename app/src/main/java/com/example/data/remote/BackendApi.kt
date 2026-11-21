@@ -175,14 +175,18 @@ class BackendApiClient(
         providerId: String,
         codeChallenge: String,
         state: String,
-        redirectUri: String
+        redirectUri: String,
+        loginHint: String? = null
     ): Result<OAuthAuthorizeConfigDto> = withContext(Dispatchers.IO) {
         runCatching {
             val cleanBase = validateHttpsUrl(baseUrl)
+            val hintQuery = loginHint?.takeIf { it.isNotBlank() }
+                ?.let { "&login_hint=${java.net.URLEncoder.encode(it, "UTF-8")}" }
+                .orEmpty()
             val url = "$cleanBase/api/oauth/$providerId/authorize" +
                 "?code_challenge=${java.net.URLEncoder.encode(codeChallenge, "UTF-8")}" +
                 "&state=${java.net.URLEncoder.encode(state, "UTF-8")}" +
-                "&redirect_uri=${java.net.URLEncoder.encode(redirectUri, "UTF-8")}"
+                "&redirect_uri=${java.net.URLEncoder.encode(redirectUri, "UTF-8")}$hintQuery"
             val request = Request.Builder()
                 .url(url)
                 .header("Authorization", "Bearer $jwtToken")

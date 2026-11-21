@@ -362,7 +362,9 @@ private fun MyDriveAppRoot(
                     composable(ROUTE_CLOUD_DRIVES) {
                         CloudDrivesScreen(
                             uiState = uiState,
-                            onConnectProvider = viewModel::startProviderOAuth,
+                            onConnectProvider = { provider, loginHint ->
+                                viewModel.startProviderOAuth(provider, loginHint)
+                            },
                             onRefreshQuotas = viewModel::refreshQuotas,
                             onDisconnectAccount = viewModel::disconnectAccount,
                             onMoveAccountPriority = viewModel::moveAccountPriority,

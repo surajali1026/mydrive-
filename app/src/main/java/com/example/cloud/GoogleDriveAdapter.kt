@@ -42,7 +42,7 @@ class GoogleDriveAdapter(
             "&response_type=code" +
             "&scope=${enc("https://www.googleapis.com/auth/drive.file openid email profile")}" +
             "&access_type=offline" +
-            "&prompt=consent" +
+            "&prompt=${enc("select_account consent")}" +
             "&code_challenge=${enc(codeChallenge)}" +
             "&code_challenge_method=S256" +
             "&state=${enc(state)}"

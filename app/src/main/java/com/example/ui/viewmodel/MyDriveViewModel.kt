@@ -237,10 +237,10 @@ class MyDriveViewModel(
 
     // ==================== CLOUD PROVIDERS ====================
 
-    fun startProviderOAuth(provider: CloudProviderType) {
+    fun startProviderOAuth(provider: CloudProviderType, loginHint: String? = null) {
         viewModelScope.launch {
             ephemeral.update { it.copy(isBusy = true) }
-            val result = repository.buildProviderOAuthUrl(provider)
+            val result = repository.buildProviderOAuthUrl(provider, loginHint)
             ephemeral.update { it.copy(isBusy = false) }
             result.fold(
                 onSuccess = { url -> ephemeral.update { it.copy(pendingOAuthUrl = url) } },
@@ -301,7 +301,8 @@ class MyDriveViewModel(
             when (res) {
                 is SmartUploadResult.Success -> {
                     val warn = if (res.warningAddAnotherDrive) " (Above 70% — add another drive soon)" else ""
-                    showMessage("Uploaded to ${res.usedAccount.provider.displayName}$warn")
+                    val accountLabel = res.usedAccount.accountEmail.takeIf { it.isNotBlank() }?.let { " ($it)" } ?: ""
+                    showMessage("Uploaded to ${res.usedAccount.provider.displayName}$accountLabel$warn")
                 }
                 is SmartUploadResult.NoConnectedDrives -> showMessage(res.message)
                 is SmartUploadResult.StorageFull -> showMessage(res.message)
