@@ -1,0 +1,23 @@
+<resources>
+    <string name="app_name">MyDrive</string>
+    <string name="tab_my_uploads">My Uploads</string>
+    <string name="tab_cloud_drives">Cloud Drives</string>
+    <string name="auth_title">Unified Cloud Vault</string>
+    <string name="auth_subtitle">Aggregate Google Drive, OneDrive, Dropbox, Box, pCloud &amp; Koofr with automatic 70% smart routing.</string>
+    <string name="action_sign_in">Sign In</string>
+    <string name="action_create_account">Create Account</string>
+    <string name="action_google_sign_in">Continue with Google</string>
+    <string name="action_forgot_password">Forgot Password?</string>
+    <string name="action_logout">Sign Out</string>
+    <string name="action_upload">Upload</string>
+    <string name="action_connect_drive">Connect Drive</string>
+    <string name="action_check_updates">Check for Updates</string>
+    <string name="action_install_update">Install Update (In-Place)</string>
+    <string name="auto_update_title">GitHub Auto-Update</string>
+    <string name="auto_update_subtitle">Keep MyDrive updated directly from GitHub without uninstalling or losing local data.</string>
+    <string name="backup_section_title">Auto-Backup &amp; Daily Schedule</string>
+    <string name="backup_channel_name">MyDrive Gallery Backup</string>
+    <string name="backup_channel_desc">Shows live progress and completion alerts for automatic daily gallery backups.</string>
+    <string name="update_channel_name">MyDrive App Updates</string>
+    <string name="update_channel_desc">Notifies you when a new MyDrive release is published on GitHub.</string>
+</resources>

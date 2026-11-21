@@ -1,0 +1,6 @@
+{
+  "name": "MyDrive",
+  "description": "Multi-cloud storage aggregator with smart 70% capacity auto-routing, unified file manager, daily WorkManager gallery backup, and in-place GitHub auto-updates.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
