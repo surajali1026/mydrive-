@@ -94,21 +94,23 @@ class MyDriveRepository(
         }
 
         // Local encrypted Room account creation when Node.js backend is not yet linked
-        val existing = db.userDao().getUserByEmail(cleanEmail)
-        if (existing != null) {
-            return@withContext Result.failure(IllegalStateException("An account with this email already exists."))
+        runCatching {
+            val existing = db.userDao().getUserByEmail(cleanEmail)
+            if (existing != null) {
+                throw IllegalStateException("An account with this email already exists.")
+            }
+            val user = UserEntity(
+                id = UUID.randomUUID().toString(),
+                email = cleanEmail,
+                displayName = displayName.trim().ifBlank { cleanEmail.substringBefore("@") },
+                authProvider = "email",
+                passwordHash = TokenVault.hashPassword(password),
+                isVerified = false
+            )
+            db.userDao().upsertUser(user)
+            settingsStore.setActiveUserId(user.id)
+            user
         }
-        val user = UserEntity(
-            id = UUID.randomUUID().toString(),
-            email = cleanEmail,
-            displayName = displayName.trim().ifBlank { cleanEmail.substringBefore("@") },
-            authProvider = "email",
-            passwordHash = TokenVault.hashPassword(password),
-            isVerified = false
-        )
-        db.userDao().upsertUser(user)
-        settingsStore.setActiveUserId(user.id)
-        Result.success(user)
     }
 
     suspend fun loginWithEmail(email: String, password: String): Result<UserEntity> = withContext(Dispatchers.IO) {
@@ -133,48 +135,52 @@ class MyDriveRepository(
             return@withContext Result.failure(remote.exceptionOrNull() ?: Exception("Sign-in failed"))
         }
 
-        val user = db.userDao().getUserByEmail(cleanEmail)
-            ?: return@withContext Result.failure(IllegalArgumentException("No local account found for $cleanEmail. Tap Create Account first."))
-        val storedHash = user.passwordHash
-            ?: return@withContext Result.failure(IllegalArgumentException("Use Google Sign-In for this account."))
-        if (!TokenVault.verifyPassword(password, storedHash)) {
-            return@withContext Result.failure(IllegalArgumentException("Incorrect password."))
+        runCatching {
+            val user = db.userDao().getUserByEmail(cleanEmail)
+                ?: throw IllegalArgumentException("No local account found for $cleanEmail. Tap Create Account first.")
+            val storedHash = user.passwordHash
+                ?: throw IllegalArgumentException("Use Google Sign-In for this account.")
+            if (!TokenVault.verifyPassword(password, storedHash)) {
+                throw IllegalArgumentException("Incorrect password.")
+            }
+            settingsStore.setActiveUserId(user.id)
+            user
         }
-        settingsStore.setActiveUserId(user.id)
-        Result.success(user)
     }
 
     suspend fun completeGoogleSignIn(idToken: String, email: String, displayName: String): Result<UserEntity> =
         withContext(Dispatchers.IO) {
-            val settings = settingsStore.current()
-            if (settings.backendBaseUrl.isNotBlank() && idToken.isNotBlank()) {
-                val remote = backendApi.loginWithGoogleIdToken(settings.backendBaseUrl, idToken)
-                if (remote.isSuccess) {
-                    val dto = remote.getOrThrow()
-                    tokenVault.saveJwtToken(dto.token)
-                    val user = UserEntity(
-                        id = dto.user.id,
-                        email = dto.user.email,
-                        displayName = dto.user.displayName ?: displayName,
-                        authProvider = "google",
-                        isVerified = true
-                    )
-                    db.userDao().upsertUser(user)
-                    settingsStore.setActiveUserId(user.id)
-                    return@withContext Result.success(user)
+            runCatching {
+                val settings = settingsStore.current()
+                if (settings.backendBaseUrl.isNotBlank() && idToken.isNotBlank()) {
+                    val remote = backendApi.loginWithGoogleIdToken(settings.backendBaseUrl, idToken)
+                    if (remote.isSuccess) {
+                        val dto = remote.getOrThrow()
+                        tokenVault.saveJwtToken(dto.token)
+                        val user = UserEntity(
+                            id = dto.user.id,
+                            email = dto.user.email,
+                            displayName = dto.user.displayName ?: displayName,
+                            authProvider = "google",
+                            isVerified = true
+                        )
+                        db.userDao().upsertUser(user)
+                        settingsStore.setActiveUserId(user.id)
+                        return@runCatching user
+                    }
                 }
+                val existing = db.userDao().getUserByEmail(email)
+                val user = existing ?: UserEntity(
+                    id = UUID.randomUUID().toString(),
+                    email = email.trim().lowercase(),
+                    displayName = displayName.ifBlank { email.substringBefore("@") },
+                    authProvider = "google",
+                    isVerified = true
+                )
+                db.userDao().upsertUser(user)
+                settingsStore.setActiveUserId(user.id)
+                user
             }
-            val existing = db.userDao().getUserByEmail(email)
-            val user = existing ?: UserEntity(
-                id = UUID.randomUUID().toString(),
-                email = email.trim().lowercase(),
-                displayName = displayName.ifBlank { email.substringBefore("@") },
-                authProvider = "google",
-                isVerified = true
-            )
-            db.userDao().upsertUser(user)
-            settingsStore.setActiveUserId(user.id)
-            Result.success(user)
         }
 
     suspend fun verifyEmail(userId: String): Result<Unit> = withContext(Dispatchers.IO) {

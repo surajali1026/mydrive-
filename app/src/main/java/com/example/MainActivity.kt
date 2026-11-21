@@ -151,11 +151,16 @@ private fun MyDriveAppRoot(
     val backupPermissionsLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { results ->
-        val mediaGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            results[Manifest.permission.READ_MEDIA_IMAGES] == true ||
-                results[Manifest.permission.READ_MEDIA_VIDEO] == true
-        } else {
-            results[Manifest.permission.READ_EXTERNAL_STORAGE] == true
+        val mediaGranted = when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE ->
+                results[Manifest.permission.READ_MEDIA_IMAGES] == true ||
+                    results[Manifest.permission.READ_MEDIA_VIDEO] == true ||
+                    results[Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED] == true
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
+                results[Manifest.permission.READ_MEDIA_IMAGES] == true ||
+                    results[Manifest.permission.READ_MEDIA_VIDEO] == true
+            else ->
+                results[Manifest.permission.READ_EXTERNAL_STORAGE] == true
         }
         if (mediaGranted) {
             viewModel.updateBackupPreferences(
@@ -214,7 +219,7 @@ private fun MyDriveAppRoot(
                             val request = GetCredentialRequest.Builder()
                                 .addCredentialOption(googleIdOption)
                                 .build()
-                            runCatching {
+                            try {
                                 val result = credentialManager.getCredential(context, request)
                                 val googleCred = GoogleIdTokenCredential.createFrom(result.credential.data)
                                 viewModel.completeGoogleSignIn(
@@ -222,7 +227,11 @@ private fun MyDriveAppRoot(
                                     email = googleCred.id,
                                     displayName = googleCred.displayName ?: googleCred.id.substringBefore("@")
                                 )
-                            }.onFailure {
+                            } catch (_: androidx.credentials.exceptions.NoCredentialException) {
+                                snackbarHostState.showSnackbar(
+                                    "No Google account credential available on this device. Use Email/Password or configure Google OAuth on your backend."
+                                )
+                            } catch (_: Exception) {
                                 snackbarHostState.showSnackbar(
                                     "Google Sign-In requires a configured Google OAuth Web Client ID on your backend, or sign in with Email/Password above."
                                 )
@@ -360,7 +369,12 @@ private fun MyDriveAppRoot(
                             onToggleAutoBackup = { enable ->
                                 if (enable) {
                                     val perms = buildList {
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                                            add(Manifest.permission.READ_MEDIA_IMAGES)
+                                            add(Manifest.permission.READ_MEDIA_VIDEO)
+                                            add(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)
+                                            add(Manifest.permission.POST_NOTIFICATIONS)
+                                        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                             add(Manifest.permission.READ_MEDIA_IMAGES)
                                             add(Manifest.permission.READ_MEDIA_VIDEO)
                                             add(Manifest.permission.POST_NOTIFICATIONS)

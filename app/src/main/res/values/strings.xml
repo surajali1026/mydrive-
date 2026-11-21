@@ -3,7 +3,7 @@
     <string name="tab_my_uploads">My Uploads</string>
     <string name="tab_cloud_drives">Cloud Drives</string>
     <string name="auth_title">Unified Cloud Vault</string>
-    <string name="auth_subtitle">Aggregate Google Drive, OneDrive, Dropbox, Box, pCloud &amp; Koofr with automatic 70% smart routing.</string>
+    <string name="auth_subtitle" formatted="false">Aggregate Google Drive, OneDrive, Dropbox, Box, pCloud &amp; Koofr with automatic 70% smart routing.</string>
     <string name="action_sign_in">Sign In</string>
     <string name="action_create_account">Create Account</string>
     <string name="action_google_sign_in">Continue with Google</string>

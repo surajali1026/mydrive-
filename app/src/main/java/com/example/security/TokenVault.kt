@@ -130,7 +130,7 @@ class TokenVault(context: Context) {
         }
 
         /**
-         * Salted PBKDF2-HMAC-SHA256 hash for local offline credential fallback verification.
+         * Salted PBKDF2 password hashing with API 24-25 compatibility fallback.
          */
         fun hashPassword(password: String, saltBase64: String? = null): String {
             val salt = if (saltBase64 != null) {
@@ -139,7 +139,11 @@ class TokenVault(context: Context) {
                 ByteArray(16).also { SecureRandom().nextBytes(it) }
             }
             val spec = PBEKeySpec(password.toCharArray(), salt, 65536, 256)
-            val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+            val factory = runCatching {
+                SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+            }.getOrElse {
+                SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1")
+            }
             val hash = factory.generateSecret(spec).encoded
             return "${Base64.encodeToString(salt, Base64.NO_WRAP)}:${Base64.encodeToString(hash, Base64.NO_WRAP)}"
         }
