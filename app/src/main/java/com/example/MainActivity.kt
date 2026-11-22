@@ -196,52 +196,9 @@ private fun MyDriveAppRoot(
         return
     }
 
-    // Independent MyDrive Auth Gate
+    // Personal single-device mode: wait briefly for the local owner profile to initialize.
     if (uiState.currentUser == null) {
-        Scaffold(
-            snackbarHost = { SnackbarHost(snackbarHostState) },
-            contentWindowInsets = WindowInsets.safeDrawing
-        ) { innerPadding ->
-            Box(modifier = Modifier.padding(innerPadding)) {
-                AuthScreen(
-                    backendUrl = uiState.settings.backendBaseUrl,
-                    isBusy = uiState.isBusy,
-                    onLogin = { email, pwd -> viewModel.login(email, pwd) },
-                    onRegister = { email, pwd, name -> viewModel.register(email, pwd, name) },
-                    onResetPassword = { email, newPwd -> viewModel.resetPassword(email, newPwd) },
-                    onGoogleSignInClick = {
-                        scope.launch {
-                            val credentialManager = CredentialManager.create(context)
-                            val googleIdOption = GetGoogleIdOption.Builder()
-                                .setFilterByAuthorizedAccounts(false)
-                                .setServerClientId("mydrive-google-client-id")
-                                .build()
-                            val request = GetCredentialRequest.Builder()
-                                .addCredentialOption(googleIdOption)
-                                .build()
-                            try {
-                                val result = credentialManager.getCredential(context, request)
-                                val googleCred = GoogleIdTokenCredential.createFrom(result.credential.data)
-                                viewModel.completeGoogleSignIn(
-                                    idToken = googleCred.idToken,
-                                    email = googleCred.id,
-                                    displayName = googleCred.displayName ?: googleCred.id.substringBefore("@")
-                                )
-                            } catch (_: androidx.credentials.exceptions.NoCredentialException) {
-                                snackbarHostState.showSnackbar(
-                                    "No Google account credential available on this device. Use Email/Password or configure Google OAuth on your backend."
-                                )
-                            } catch (_: Exception) {
-                                snackbarHostState.showSnackbar(
-                                    "Google Sign-In requires a configured Google OAuth Web Client ID on your backend, or sign in with Email/Password above."
-                                )
-                            }
-                        }
-                    },
-                    onSaveBackendUrl = { url -> viewModel.saveBackendUrl(url) }
-                )
-            }
-        }
+        Box(modifier = Modifier.fillMaxSize())
         return
     }
 
