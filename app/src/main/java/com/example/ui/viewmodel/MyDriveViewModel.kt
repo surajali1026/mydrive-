@@ -149,6 +149,12 @@ class MyDriveViewModel(
     )
 
     init {
+        // Single-owner mode: silently create/reuse the local profile; no sign-in screen.
+        viewModelScope.launch {
+            runCatching { repository.ensurePersonalProfile() }
+                .onFailure { showMessage(it.message ?: "Unable to open local MyDrive profile.") }
+        }
+
         // Auto-check GitHub Releases (`mydrive` repo) silently on launch if configured & enabled
         viewModelScope.launch {
             val settings = repository.settingsStore.current()
