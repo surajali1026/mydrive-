@@ -62,6 +62,23 @@ jobs:
             echo "WARNING: KEYSTORE_BASE64 secret not set. Falling back to debug APK build."
           fi
 
+      - name: Prepare CI Debug Keystore (fallback builds only)
+        run: |
+          # app/build.gradle.kts explicitly points debugConfig at this file.
+          # GitHub runners are clean, so create the standard Android debug key
+          # when no persistent release keystore is configured.
+          if [[ ! -f "my-upload-key.jks" && ! -f "debug.keystore" ]]; then
+            keytool -genkeypair -v \
+              -keystore debug.keystore \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
       - name: Run Unit & Robolectric Tests
         run: gradle :app:testDebugUnitTest
 
