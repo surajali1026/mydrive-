@@ -58,6 +58,31 @@ class MyDriveRepository(
     fun observeTransfers(userId: String?): Flow<List<TransferTaskEntity>> =
         if (userId.isNullOrBlank()) flowOf(emptyList()) else db.transferTaskDao().observeTasks(userId)
 
+    // ==================== PERSONAL / SINGLE-DEVICE MODE ====================
+
+    /**
+     * Creates one local owner profile on first launch. No email, password, backend,
+     * Firebase, or Google sign-in is required for a single-device installation.
+     */
+    suspend fun ensurePersonalProfile(): UserEntity = withContext(Dispatchers.IO) {
+        val settings = settingsStore.current()
+        val activeId = settings.activeUserId
+        if (!activeId.isNullOrBlank()) {
+            db.userDao().getUserById(activeId)?.let { return@withContext it }
+        }
+
+        val localEmail = "owner@mydrive.local"
+        val user = db.userDao().getUserByEmail(localEmail) ?: UserEntity(
+            id = "mydrive-local-owner",
+            email = localEmail,
+            displayName = "MyDrive Owner",
+            authProvider = "local"
+        )
+        db.userDao().upsertUser(user)
+        settingsStore.setActiveUserId(user.id)
+        user
+    }
+
     // ==================== AUTHENTICATION ====================
 
     suspend fun registerWithEmail(
