@@ -470,13 +470,18 @@ app.get("/api/files", requireAuth, async (req: AuthenticatedRequest, res) => {
 });
 
 const port = Number(process.env.PORT || 4000);
-initializeDatabase(pool)
-  .then(() => {
-    app.listen(port, () => {
-      console.log(`MyDrive OAuth Broker & Metadata API listening on port ${port}`);
-    });
-  })
-  .catch((error: unknown) => {
+const startServer = () => {
+  app.listen(port, () => {
+    console.log(`MyDrive OAuth Broker & Metadata API listening on port ${port}`);
+  });
+};
+
+if (process.env.DATABASE_URL) {
+  initializeDatabase(pool).then(startServer).catch((error: unknown) => {
     console.error("MyDrive database initialization failed:", error);
     process.exit(1);
   });
+} else {
+  console.warn("DATABASE_URL is not configured; database-backed API routes will not work yet.");
+  startServer();
+}
