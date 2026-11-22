@@ -8,6 +8,7 @@ import { z } from "zod";
 import { AuthenticatedRequest, requireAuth, signUserJwt } from "./authMiddleware";
 import { decryptTokens, encryptTokens, hashPassword, verifyPassword } from "./crypto";
 import { getProviderSpec } from "./oauthProviders";
+import { initializeDatabase } from "./dbInit";
 
 const app = express();
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -469,6 +470,13 @@ app.get("/api/files", requireAuth, async (req: AuthenticatedRequest, res) => {
 });
 
 const port = Number(process.env.PORT || 4000);
-app.listen(port, () => {
-  console.log(`MyDrive OAuth Broker & Metadata API listening on port ${port}`);
-});
+initializeDatabase(pool)
+  .then(() => {
+    app.listen(port, () => {
+      console.log(`MyDrive OAuth Broker & Metadata API listening on port ${port}`);
+    });
+  })
+  .catch((error: unknown) => {
+    console.error("MyDrive database initialization failed:", error);
+    process.exit(1);
+  });
